@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Atom2Mol - eV/atom ↔ J/mol 转换（CALPHAD）</title>
+  <meta name="description" content="用于CALPHAD热力学的 eV/atom 与 J/mol 互相转换的轻量级工具" />
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #111827;
+      --text: #e5e7eb;
+      --muted: #94a3b8;
+      --accent: #22d3ee;
+      --accent2: #a78bfa;
+      --border: #1f2937;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      background: linear-gradient(120deg, #0f172a, #111827 60%, #0f172a);
+      color: var(--text);
+    }
+    header {
+      padding: 24px 16px; text-align: center;
+    }
+    header h1 {
+      margin: 0; font-size: 28px; letter-spacing: 0.5px;
+    }
+    header p { margin: 6px 0 0; color: var(--muted); }
+    main { max-width: 840px; margin: 0 auto; padding: 0 16px 48px; }
+    .card {
+      background: rgba(17,24,39,0.9); border: 1px solid var(--border); border-radius: 16px;
+      padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    }
+    .card h2 { margin-top: 0; font-size: 20px; }
+    .row { display: flex; align-items: center; gap: 12px; margin: 12px 0; flex-wrap: wrap; }
+    label { min-width: 140px; color: var(--muted); }
+    input[type="number"], select {
+      flex: 1; min-width: 220px;
+      padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+      background: #0b1220; color: var(--text);
+    }
+    small { color: var(--muted); }
+    .options { display: flex; gap: 16px; }
+    .options label { min-width: unset; }
+    button {
+      padding: 10px 16px; border-radius: 10px; border: 1px solid transparent; cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #0b1220; font-weight: 600;
+    }
+    button.secondary { background: transparent; color: var(--text); border-color: var(--border); }
+    .result {
+      margin-top: 10px; padding: 12px; background: #0b1220; border: 1px solid var(--border); border-radius: 10px;
+      font-size: 16px; min-height: 40px;
+    }
+    .error { color: var(--danger); }
+    details { margin-top: 8px; }
+    footer { text-align: center; margin-top: 18px; color: var(--muted); font-size: 13px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Atom2Mol</h1>
+    <p>用于 CALPHAD 的 eV/atom ↔ J/mol 转换小工具</p>
+  </header>
+  <main>
+    <section class="card">
+      <h2>eV/atom 与 J/mol 互转</h2>
+      <div class="row">
+        <label>转换方向</label>
+        <div class="options" role="group" aria-label="转换方向">
+          <label><input type="radio" name="mode" value="eV_to_J" checked> eV/atom → J/mol</label>
+          <label><input type="radio" name="mode" value="J_to_eV"> J/mol → eV/atom</label>
+        </div>
+      </div>
+      <div class="row">
+        <label>输入数值</label>
+        <input type="number" id="inputVal" placeholder="例如 0.12" step="any"/>
+      </div>
+      <div class="row">
+        <label>每化学式原子数 n</label>
+        <input type="number" id="nAtoms" value="1" min="1" step="1"/>
+        <small>若换算每化学式的 J/mol，请设置 n；默认 n=1 即每原子的 J/mol。</small>
+      </div>
+      <div class="row">
+        <button id="convertBtn">计算</button>
+        <button id="clearBtn" class="secondary">清空</button>
+      </div>
+      <div class="result" id="result" aria-live="polite"></div>
+      <div class="row">
+        <button id="copyBtn" class="secondary">复制结果</button>
+      </div>
+      <details>
+        <summary>公式与常数</summary>
+        <div style="margin-top:8px;">
+          <div>常数（SI 2019 定义）：</div>
+          <ul>
+            <li class="mono">eV→J：1 eV = 1.602176634×10⁻¹⁹ J</li>
+            <li class="mono">N<sub>A</sub>：阿伏伽德罗常数 = 6.02214076×10²³ mol⁻¹</li>
+            <li class="mono">转换因子 F = 1 eV/atom × N<sub>A</sub> × (J/eV) ≈ 96485.33212331002 J/mol</li>
+          </ul>
+          <div>公式：</div>
+          <ul>
+            <li class="mono">J/mol(原子) = (eV/atom) × F</li>
+            <li class="mono">J/mol(化学式) = (eV/atom) × n × F</li>
+            <li class="mono">eV/atom = (J/mol(化学式)) / (n × F)</li>
+          </ul>
+        </div>
+      </details>
+    </section>
+    <footer>Made for CALPHAD · 常数采用 SI 2019 定义 · 离线可用</footer>
+  </main>
+  <script>
+    const EV_TO_J = 1.602176634e-19;
+    const AVOGADRO = 6.02214076e23;
+    const FACTOR = EV_TO_J * AVOGADRO; // ≈ 96485.33212331002 J/mol
+
+    const modeEls = document.getElementsByName('mode');
+    const inputEl = document.getElementById('inputVal');
+    const nEl = document.getElementById('nAtoms');
+    const resultEl = document.getElementById('result');
+    const convertBtn = document.getElementById('convertBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const copyBtn = document.getElementById('copyBtn');
+
+    function getMode() {
+      for (const el of modeEls) if (el.checked) return el.value;
+      return 'eV_to_J';
+    }
+
+    function formatNumber(num) {
+      if (!isFinite(num)) return String(num);
+      const abs = Math.abs(num);
+      // 用科学计数法表示非常大或非常小的数
+      if ((abs !== 0 && abs < 1e-4) || abs >= 1e6) {
+        return num.toExponential(6);
+      }
+      // 否则用本地化格式，限定最多 6 位小数
+      return num.toLocaleString(undefined, { maximumFractionDigits: 6 });
+    }
+
+    function convert() {
+      const mode = getMode();
+      const raw = inputEl.value.trim();
+      const n = Number(nEl.value);
+      const val = Number(raw);
+
+      if (!raw) {
+        resultEl.innerHTML = '<span class="error">请先输入数值。</span>';
+        return;
+      }
+      if (!isFinite(val)) {
+        resultEl.innerHTML = '<span class="error">输入必须是有效数字。</span>';
+        return;
+      }
+      if (!Number.isInteger(n) || n < 1) {
+        resultEl.innerHTML = '<span class="error">每化学式原子数 n 必须为 ≥1 的整数。</span>';
+        return;
+      }
+
+      let out, unit;
+      if (mode === 'eV_to_J') {
+        // eV/atom → J/mol(化学式)，当 n=1 时即 J/mol(原子)
+        out = val * n * FACTOR;
+        unit = 'J/mol';
+      } else {
+        // J/mol(化学式) → eV/atom
+        out = val / (n * FACTOR);
+        unit = 'eV/atom';
+      }
+
+      const text = `${formatNumber(out)} ${unit}`;
+      resultEl.textContent = text;
+      return text; // 便于复制
+    }
+
+    convertBtn.addEventListener('click', convert);
+    clearBtn.addEventListener('click', () => {
+      inputEl.value = '';
+      nEl.value = 1;
+      resultEl.textContent = '';
+      inputEl.focus();
+    });
+    copyBtn.addEventListener('click', async () => {
+      const current = resultEl.textContent.trim();
+      if (!current) {
+        resultEl.innerHTML = '<span class="error">没有可复制的结果，请先计算。</span>';
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(current);
+        const prev = resultEl.textContent;
+        resultEl.textContent = prev + ' (已复制)';
+        setTimeout(() => { resultEl.textContent = prev; }, 1200);
+      } catch (e) {
+        resultEl.innerHTML = current + ' (复制失败)';
+      }
+    });
+
+    // 回车即计算
+    inputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') convert(); });
+    nEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') convert(); });
+  </script>
+</body>
+</html>
