@@ -2,6 +2,9 @@
 
 用于 CALPHAD 热力学的 eV/atom 与 J/mol 互相转换的轻量级小工具。
 
+<img width="939" height="586" alt="image" src="https://github.com/user-attachments/assets/e46dc0da-1adf-4b9a-a411-34bb33594892" />
+
+
 - 纯前端实现，双击 `index.html` 即可离线使用。
 - 支持将 eV/atom 转为 J/mol（原子或化学式），以及反向转换。
 - 常数采用 SI 2019 重新定义后的精确定义。
